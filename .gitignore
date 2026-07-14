@@ -1,0 +1,6 @@
+node_modules/
+dist/
+artifacts/
+upstream/
+.DS_Store
+*.log

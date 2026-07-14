@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "mermaid-studio": {
+      "command": "node",
+      "args": ["/Users/gauravsdama/git/mermaid-studio/dist/mcp/index.js"],
+      "env": {
+        "MCP_API_BASE_URL": "http://127.0.0.1:8787"
+      }
+    }
+  }
+}
