@@ -16,6 +16,7 @@ The first-party source is owned by Gaurav Dama and licensed under Apache-2.0. Th
 - `npm run test:release` passed type checking, linting, production build, UI-copy checks, API security and failure cases, artifact schema and pagination checks, three export fixtures, browser interaction and responsive checks, and the MCP create/get/list/update flow.
 - `npm audit --omit=dev` reported zero vulnerabilities.
 - `npm run test:demo` built the client-only GitHub Pages variant and rendered five clearly labeled simulated prompts without contacting an API backend.
+- GitHub Actions verification run `35034515337` passed on the pushed commit. Pages run `35034514980` built, browser-tested, and deployed the public demo; a separate hosted-browser pass then exercised all five prompts without an API request.
 - The final local run used Node 25.2.1, npm 11.6.2, and Apple Swift 6.3.2. The SHA-256 digest of `package-lock.json` was `3353c87d2b5af8007a9afdbb98bc087ddd2375601d85a6379f5f8400d87cfd62`.
 - `npm run test:native` built the SwiftUI/WebKit host, launched its local Node server, terminated the host, and confirmed that the child listener closed.
 - `docs/screenshots/mermaid-studio-current.png` was captured by the current browser test.
