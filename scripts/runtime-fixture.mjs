@@ -14,13 +14,13 @@ async function reservePort() {
   return port;
 }
 
-export async function createRuntimeFixture() {
+export async function createRuntimeFixture(environment = {}) {
   const artifactRoot = await mkdtemp(join(tmpdir(), "mermaid-studio-test-artifacts-"));
   const port = await reservePort();
   const baseUrl = `http://127.0.0.1:${port}`;
   const child = spawn(process.execPath, ["dist/server/index.js"], {
     cwd: process.cwd(),
-    env: { ...process.env, PORT: String(port), MERMAID_STUDIO_ARTIFACT_ROOT: artifactRoot },
+    env: { ...process.env, ...environment, PORT: String(port), MERMAID_STUDIO_ARTIFACT_ROOT: artifactRoot },
     stdio: ["ignore", "ignore", "pipe"]
   });
   let stderr = "";

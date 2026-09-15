@@ -1,7 +1,7 @@
 {
   "name": "mermaid-studio-local",
   "version": "0.1.0",
-  "license": "MIT",
+  "license": "Apache-2.0",
   "private": true,
   "type": "module",
   "description": "A local Mermaid renderer, optional flowchart layout editor, artifact store, and MCP gateway.",
@@ -12,6 +12,7 @@
     "mcp": "tsx mcp/index.ts",
     "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.server.json",
     "build": "npm run typecheck && vite build && tsc -p tsconfig.server.json",
+    "build:demo": "VITE_STATIC_DEMO=true VITE_BASE_PATH=/mermaid-studio-local/ VITE_OUT_DIR=dist-demo vite build",
     "start": "node dist/server/index.js",
     "start:mcp": "node dist/mcp/index.js",
     "native:viewer": "npm run build && swift run --package-path native/MermaidStudioViewer",
@@ -21,7 +22,8 @@
     "test:native": "swift build --package-path native/MermaidStudioViewer && node scripts/native-lifecycle.mjs",
     "test:server": "node scripts/server-smoke.mjs",
     "test:copy": "node scripts/check-ui-copy.mjs",
-    "test:release": "npm run test && npm run build && npm run test:copy && npm run test:server && npm run test:browser && npm run test:mcp",
+    "test:demo": "npm run build:demo && node scripts/demo-smoke.mjs",
+    "test:release": "npm run test && npm run build && npm run test:copy && npm run test:server && npm run test:browser && npm run test:mcp && npm run test:demo",
     "lint": "eslint ."
   },
   "engines": {

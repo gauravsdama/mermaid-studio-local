@@ -22,6 +22,10 @@ npm run start
 
 Then open `http://127.0.0.1:8787`.
 
+## Static demo
+
+`npm run test:demo` builds the GitHub Pages variant under `dist-demo/` and exercises all five simulated prompts in a real browser. The demo is intentionally client-only: each prompt loads a deterministic example, and no model, API server, or app-folder save action is presented. The Pages workflow publishes this build from `main` at the repository base path.
+
 ## Optional layout editor
 
 The canvas is a normal live Mermaid preview by default. Choose **Edit layout** only for a flowchart when a manual adjustment is needed:
@@ -57,6 +61,8 @@ npm run test:native
 
 The server, browser, and MCP tests create private temporary artifact directories and remove them after each run. `test:browser` uses Chrome at `/Applications/Google Chrome.app/Contents/MacOS/Google Chrome` by default; set `CHROME_PATH` for another local Chrome executable. `test:native` requires macOS 14 or later and verifies that the viewer terminates the Node process it starts.
 
+The loopback API intentionally has no per-launch token. Mermaid Studio is designed for one trusted local macOS account, rejects non-loopback Host and browser Origin values, limits request sizes, validates stored paths, and bounds expensive headless renders. Authentication can be reconsidered if untrusted same-account processes become part of the threat model.
+
 ## Upstream references
 
 The following repositories were consulted as local design and behavior references. They are excluded from this app repository so their nested Git histories are not published as embedded repositories:
@@ -69,4 +75,4 @@ No upstream application source is intentionally included in this repository. See
 
 ## License
 
-Copyright 2026 Gaurav Dama. Licensed under the [MIT License](./LICENSE).
+Copyright 2026 Gaurav Dama. Licensed under the [Apache License 2.0](./LICENSE).

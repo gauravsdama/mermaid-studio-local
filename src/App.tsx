@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { presets } from "./data/presets";
+import { demoPrompts } from "./data/demoPrompts";
 import { cleanSvgForExport, downloadDataUrl, downloadText, filenameFor, svgToPngDataUrl } from "./lib/export";
 import { enableFlowEditor } from "./lib/flowEditor";
 import { deleteFromLibrary, getHistory, getLibrary, rememberDiagram, saveToLibrary } from "./lib/storage";
@@ -13,6 +14,7 @@ const STARTER = `flowchart LR
   Arrange --> Export`;
 
 const THEMES: DiagramTheme[] = ["default", "dark", "forest", "neutral", "base"];
+const STATIC_DEMO = import.meta.env.VITE_STATIC_DEMO === "true";
 
 function App() {
   const [title, setTitle] = useState("Untitled diagram");
@@ -169,6 +171,15 @@ function App() {
     setNotice(`Loaded “${item.title}”`);
   };
 
+  const loadDemoPrompt = (index: number): void => {
+    const prompt = demoPrompts[index];
+    if (!prompt) return;
+    setTitle(prompt.title);
+    setSource(prompt.source);
+    setTheme(prompt.theme);
+    setNotice(`Loaded demo prompt “${prompt.label}”`);
+  };
+
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       if (!(event.metaKey || event.ctrlKey)) return;
@@ -190,16 +201,21 @@ function App() {
   return (
     <main className="app-shell">
       <header className="topbar">
-        <div className="brand"><span className="brand-mark">↗</span><span>Mermaid <b>Studio</b></span><em>local</em></div>
+        <div className="brand"><span className="brand-mark">↗</span><span>Mermaid <b>Studio</b></span><em>{STATIC_DEMO ? "demo" : "local"}</em></div>
         <div className="title-input"><label htmlFor="diagram-title">Diagram title</label><input id="diagram-title" value={title} onChange={(event) => setTitle(event.target.value)} maxLength={120} /></div>
         <div className="header-actions">
           <button className="ghost" onClick={saveLocal}>Save library</button>
-          <button className="primary" onClick={() => void saveToFolder()}>Save to app folder</button>
+          {!STATIC_DEMO && <button className="primary" onClick={() => void saveToFolder()}>Save to app folder</button>}
         </div>
       </header>
 
       <section className="workspace">
         <aside className="sidebar" aria-label="Diagram tools">
+          {STATIC_DEMO && <section>
+            <p className="eyebrow">Simulated prompts</p>
+            <p className="tiny-note">Each prompt loads a local example. No model or backend is running.</p>
+            <div className="demo-list">{demoPrompts.map((prompt, index) => <button key={prompt.label} onClick={() => loadDemoPrompt(index)}>{prompt.label}</button>)}</div>
+          </section>}
           <section>
             <p className="eyebrow">Starting point</p>
             <select aria-label="Preset diagrams" defaultValue="" onChange={(event) => {

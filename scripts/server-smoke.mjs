@@ -1,4 +1,5 @@
-import { readFile, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { request } from "node:http";
 import { createRuntimeFixture } from "./runtime-fixture.mjs";
@@ -37,6 +38,8 @@ try {
   if (oversized.response.status !== 400) throw new Error(`Oversized Mermaid returned ${oversized.response.status}, expected 400.`);
   const invalidPng = await json("/api/diagrams", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ title: "Not a PNG", source: "flowchart LR\nA-->B", theme: "default", pngDataUrl: "data:image/png;base64,bm90LXBuZw==" }) });
   if (invalidPng.response.status !== 400) throw new Error(`Invalid PNG returned ${invalidPng.response.status}, expected 400.`);
+  const traversal = await fetch(`${fixture.baseUrl}/api/diagrams/..%2F..%2Fetc%2Fpasswd`);
+  if (traversal.status !== 404) throw new Error(`Path traversal returned ${traversal.status}, expected 404.`);
 
   const diagrams = [
     ["Flowchart labels", "flowchart LR\n  A[First line<br/>Second line] --> B[Finish]"],
@@ -74,4 +77,22 @@ try {
   console.log("server smoke passed; guards, schema, pagination, malformed input, and three export types verified");
 } finally {
   await fixture.stop();
+}
+
+const failureTemp = await mkdtemp(join(tmpdir(), "mermaid-studio-failure-test-"));
+const failureFixture = await createRuntimeFixture({ MERMAID_STUDIO_RENDER_TIMEOUT_MS: "1", TMPDIR: failureTemp });
+try {
+  const response = await fetch(`${failureFixture.baseUrl}/api/diagrams/render`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ title: "Forced timeout", source: "flowchart LR\n  A --> B", theme: "default", scale: 1 })
+  });
+  if (response.status !== 422) throw new Error(`Forced render timeout returned ${response.status}, expected 422.`);
+  const temporaryEntries = await readdir(failureTemp);
+  if (temporaryEntries.some((name) => name.startsWith("mermaid-studio-"))) throw new Error("Failed render left a temporary renderer directory behind.");
+  if ((await readdir(failureFixture.artifactRoot)).length) throw new Error("Failed render wrote a partial artifact.");
+  console.log("render timeout passed; failed render left no temporary or stored artifacts");
+} finally {
+  await failureFixture.stop();
+  await rm(failureTemp, { recursive: true, force: true });
 }

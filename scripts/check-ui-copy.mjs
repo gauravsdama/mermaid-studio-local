@@ -1,10 +1,11 @@
 import { readFile } from "node:fs/promises";
 
-const [inventory, app, editor, styles] = await Promise.all([
+const [inventory, app, editor, styles, demoPrompts] = await Promise.all([
   readFile("docs/product/UI_COPY.md", "utf8"),
   readFile("src/App.tsx", "utf8"),
   readFile("src/lib/flowEditor.ts", "utf8"),
-  readFile("src/styles.css", "utf8")
+  readFile("src/styles.css", "utf8"),
+  readFile("src/data/demoPrompts.ts", "utf8")
 ]);
 
 const approved = [
@@ -26,6 +27,15 @@ for (const [id, text] of approved) {
 }
 for (const [id, pattern] of [["layout.node", "Move ${nodeName}"], ["layout.connector", "Adjust connector ${edgeIndex + 1}"]]) {
   if (!inventory.includes(`| \`${id}\``) || !editor.includes(pattern)) throw new Error(`Flow editor is missing ${id}: ${pattern}`);
+}
+for (const [id, text] of [
+  ["demo.prompt.checkout", "Map a checkout request"],
+  ["demo.prompt.incident", "Trace an incident handoff"],
+  ["demo.prompt.release", "Model release data"],
+  ["demo.prompt.launch", "Plan a launch timeline"],
+  ["demo.prompt.order", "Show order states"]
+]) {
+  if (!inventory.includes(`| \`${id}\``) || !demoPrompts.includes(text)) throw new Error(`Static demo copy is missing ${id}: ${text}`);
 }
 if (/fonts\.googleapis\.com|@import\s+url/i.test(styles)) throw new Error("UI stylesheet still loads an external font.");
 console.log(`UI copy check passed; ${approved.length + 2} stable IDs and offline fonts verified`);

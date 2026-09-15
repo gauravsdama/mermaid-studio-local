@@ -9,6 +9,8 @@ import { APP_ROOT } from "./paths.js";
 const execFileAsync = promisify(execFile);
 const renderConcurrency = Math.min(3, Math.max(1, Math.floor(availableParallelism() / 4)));
 const maxQueuedRenders = renderConcurrency * 4;
+const configuredTimeout = Number(process.env.MERMAID_STUDIO_RENDER_TIMEOUT_MS ?? 60_000);
+const renderTimeoutMs = Number.isFinite(configuredTimeout) ? Math.max(1, Math.floor(configuredTimeout)) : 60_000;
 let activeRenders = 0;
 const waiting: Array<() => void> = [];
 
@@ -41,8 +43,8 @@ export async function renderMermaidArtifacts(source: string, theme: string, scal
     const command = process.platform === "win32" ? join(APP_ROOT, "node_modules", ".bin", "mmdc.cmd") : join(APP_ROOT, "node_modules", ".bin", "mmdc");
     await writeFile(input, source, "utf8");
     await Promise.all([
-      execFileAsync(command, ["-i", input, "-o", output, "-t", theme, "-b", "transparent", "-s", String(scale)], { timeout: 60_000, maxBuffer: 1024 * 1024 }),
-      execFileAsync(command, ["-i", input, "-o", svgOutput, "-t", theme, "-b", "transparent"], { timeout: 60_000, maxBuffer: 1024 * 1024 })
+      execFileAsync(command, ["-i", input, "-o", output, "-t", theme, "-b", "transparent", "-s", String(scale)], { timeout: renderTimeoutMs, maxBuffer: 1024 * 1024 }),
+      execFileAsync(command, ["-i", input, "-o", svgOutput, "-t", theme, "-b", "transparent"], { timeout: renderTimeoutMs, maxBuffer: 1024 * 1024 })
     ]);
     const [png, svg] = await Promise.all([readFile(output), readFile(svgOutput, "utf8")]);
     return { png, svg };
