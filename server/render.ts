@@ -40,11 +40,13 @@ export async function renderMermaidArtifacts(source: string, theme: string, scal
     const input = join(temp, "diagram.mmd");
     const output = join(temp, "diagram.png");
     const svgOutput = join(temp, "diagram.svg");
+    const config = join(temp, "mermaid-config.json");
     const command = process.platform === "win32" ? join(APP_ROOT, "node_modules", ".bin", "mmdc.cmd") : join(APP_ROOT, "node_modules", ".bin", "mmdc");
-    await writeFile(input, source, "utf8");
+    await Promise.all([writeFile(input, source, "utf8"), writeFile(config, JSON.stringify({ theme }), "utf8")]);
+    const themeArguments = theme === "base" ? ["-c", config] : ["-t", theme];
     await Promise.all([
-      execFileAsync(command, ["-i", input, "-o", output, "-t", theme, "-b", "transparent", "-s", String(scale)], { timeout: renderTimeoutMs, maxBuffer: 1024 * 1024 }),
-      execFileAsync(command, ["-i", input, "-o", svgOutput, "-t", theme, "-b", "transparent"], { timeout: renderTimeoutMs, maxBuffer: 1024 * 1024 })
+      execFileAsync(command, ["-i", input, "-o", output, ...themeArguments, "-b", "transparent", "-s", String(scale)], { timeout: renderTimeoutMs, maxBuffer: 1024 * 1024 }),
+      execFileAsync(command, ["-i", input, "-o", svgOutput, ...themeArguments, "-b", "transparent"], { timeout: renderTimeoutMs, maxBuffer: 1024 * 1024 })
     ]);
     const [png, svg] = await Promise.all([readFile(output), readFile(svgOutput, "utf8")]);
     return { png, svg };

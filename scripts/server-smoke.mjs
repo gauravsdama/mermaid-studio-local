@@ -42,12 +42,12 @@ try {
   if (traversal.status !== 404) throw new Error(`Path traversal returned ${traversal.status}, expected 404.`);
 
   const diagrams = [
-    ["Flowchart labels", "flowchart LR\n  A[First line<br/>Second line] --> B[Finish]"],
-    ["Sequence", "sequenceDiagram\n  Alice->>Bob: Hello\n  Bob-->>Alice: Ready"],
-    ["State", "stateDiagram-v2\n  [*] --> Draft\n  Draft --> Done\n  Done --> [*]"]
+    ["Flowchart labels", "flowchart LR\n  A[First line<br/>Second line] --> B[Finish]", "base"],
+    ["Sequence", "sequenceDiagram\n  Alice->>Bob: Hello\n  Bob-->>Alice: Ready", "default"],
+    ["State", "stateDiagram-v2\n  [*] --> Draft\n  Draft --> Done\n  Done --> [*]", "default"]
   ];
-  for (const [title, source] of diagrams) {
-    const result = await json("/api/diagrams/render", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ title, source, theme: "default", scale: 2 }) });
+  for (const [title, source, theme] of diagrams) {
+    const result = await json("/api/diagrams/render", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ title, source, theme, scale: 2 }) });
     if (result.response.status !== 201) throw new Error(`${title} render failed: ${JSON.stringify(result.body)}`);
     const artifact = result.body.artifact;
     const png = await readFile(join(process.cwd(), artifact.pngPath));

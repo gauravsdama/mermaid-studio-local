@@ -21,7 +21,7 @@ The first-party source is owned by Gaurav Dama and licensed under Apache-2.0. Th
 - `npm run test:native` built the SwiftUI/WebKit host, launched its local Node server, terminated the host, and confirmed that the child listener closed.
 - `docs/screenshots/mermaid-studio-current.png` was captured by the current browser test.
 
-The server, browser, and MCP checks use temporary artifact directories and clean them after the run. The server test covers hostile Host and Origin headers, malformed Mermaid, oversized source, invalid PNG bytes, strict metadata rejection, bounded pagination, alpha-capable PNG output, SVG output, multiline labels, flowcharts, sequence diagrams, and state diagrams. The browser test covers keyboard layout movement, connector persistence after finishing layout, SVG title and description elements, reduced motion, and a narrow viewport.
+The server, browser, and MCP checks use temporary artifact directories and clean them after the run. The server test covers hostile Host and Origin headers, malformed Mermaid, oversized source, invalid PNG bytes, strict metadata rejection, bounded pagination, alpha-capable PNG output, SVG output, multiline labels, the Mermaid base theme, flowcharts, sequence diagrams, and state diagrams. The browser test covers keyboard layout movement, connector persistence after finishing layout, SVG title and description elements, reduced motion, and a narrow viewport. A final PowerPoint Local bridge run created and visually checked a transparent PNG using the base theme.
 
 ## Before tagging
 
