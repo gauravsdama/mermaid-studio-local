@@ -34,11 +34,8 @@ try {
   if (await svg.getAttribute("role") !== "img" || !(await svg.locator("title").textContent()) || !(await svg.locator("desc").textContent())) throw new Error("Rendered SVG is missing its accessible title or summary.");
   await page.getByRole("button", { name: "Save to app folder" }).click();
   await page.getByText("Saved PNG, Mermaid code, and SVG").waitFor({ timeout: 15_000 });
-  await page.getByRole("button", { name: "Edit layout" }).click();
-  await page.getByRole("button", { name: "Finish layout" }).click();
-  await page.getByRole("button", { name: "Zoom out" }).click();
-  await page.getByRole("button", { name: "Zoom out" }).click();
-  await page.getByRole("button", { name: "Zoom out" }).click();
+  await page.reload({ waitUntil: "networkidle" });
+  await page.locator(".diagram-stage svg").waitFor({ state: "visible" });
   const screenshotPath = process.env.SCREENSHOT_PATH ?? "/tmp/mermaid-studio-smoke.png";
   await mkdir(dirname(screenshotPath), { recursive: true });
   await page.screenshot({ path: screenshotPath, fullPage: true });
