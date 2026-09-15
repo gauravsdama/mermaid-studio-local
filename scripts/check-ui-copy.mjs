@@ -9,8 +9,6 @@ const [inventory, app, editor, styles] = await Promise.all([
 
 const approved = [
   ["diagram.title.default", "Untitled diagram"], ["diagram.title.label", "Diagram title"],
-  ["share.action", "Share source"], ["share.privacy", "Source links include the full diagram text."],
-  ["share.success", "Copied source link. Anyone with it can read the diagram text."],
   ["library.save", "Save library"], ["folder.save", "Save to app folder"],
   ["preset.group", "Starting point"], ["preset.placeholder", "Choose a preset…"],
   ["settings.group", "Render settings"], ["theme.label", "Mermaid theme"],

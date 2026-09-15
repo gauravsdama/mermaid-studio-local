@@ -7,10 +7,6 @@ This file is the human-owned source of truth for visible and assistive copy. Kee
 | `app.brand` | Header | Mermaid Studio / local | `src/App.tsx` |
 | `diagram.title.default` | New draft | Untitled diagram | `src/App.tsx` |
 | `diagram.title.label` | Header field | Diagram title | `src/App.tsx` |
-| `share.action` | Header | Share source | `src/App.tsx` |
-| `share.privacy` | Header note | Source links include the full diagram text. | `src/App.tsx` |
-| `share.success` | Status | Copied source link. Anyone with it can read the diagram text. | `src/App.tsx` |
-| `share.failure` | Status | Clipboard access was blocked. Copy the address bar URL instead. | `src/App.tsx` |
 | `library.save` | Header | Save library | `src/App.tsx` |
 | `folder.save` | Header | Save to app folder | `src/App.tsx` |
 | `sidebar.label` | Navigation | Diagram tools | `src/App.tsx` |

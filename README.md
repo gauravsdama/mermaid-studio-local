@@ -48,10 +48,6 @@ For development without compiling, run `npm run mcp` in a second terminal while 
 
 `npm run native:viewer` builds the web client and opens it in the included SwiftUI/WebKit development host. The host currently runs from this checkout and requires the installed Node dependencies and a system Node runtime. It is not a standalone, signed, or notarized macOS application package.
 
-## Source links
-
-**Share source** copies a URL whose fragment contains the complete Mermaid text. URL fragments are not sent to the local HTTP server, but the URL may still be retained by browser history, clipboard managers, synchronization, chat, or email. Do not share a source link when the diagram contains information its recipient should not read.
-
 ## Verification
 
 ```bash

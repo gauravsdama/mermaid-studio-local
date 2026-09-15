@@ -14,23 +14,9 @@ const STARTER = `flowchart LR
 
 const THEMES: DiagramTheme[] = ["default", "dark", "forest", "neutral", "base"];
 
-function readSharedDiagram(): string | undefined {
-  try {
-    const fragment = window.location.hash.startsWith("#") ? window.location.hash.slice(1) : window.location.hash;
-    const encoded = new URLSearchParams(fragment).get("diagram") ?? new URLSearchParams(window.location.search).get("diagram");
-    return encoded ? decodeURIComponent(escape(atob(encoded))) : undefined;
-  } catch {
-    return undefined;
-  }
-}
-
-function encodeDiagram(source: string): string {
-  return btoa(unescape(encodeURIComponent(source)));
-}
-
 function App() {
   const [title, setTitle] = useState("Untitled diagram");
-  const [source, setSource] = useState(() => readSharedDiagram() ?? STARTER);
+  const [source, setSource] = useState(STARTER);
   const [theme, setTheme] = useState<DiagramTheme>("default");
   const [svgMarkup, setSvgMarkup] = useState("");
   const [error, setError] = useState("");
@@ -176,18 +162,6 @@ function App() {
     }
   }, [buildPng, remember, title]);
 
-  const share = useCallback(async () => {
-    const url = new URL(window.location.href);
-    url.search = "";
-    url.hash = `diagram=${encodeURIComponent(encodeDiagram(source))}`;
-    try {
-      await navigator.clipboard.writeText(url.toString());
-      setNotice("Copied source link. Anyone with it can read the diagram text.");
-    } catch {
-      setNotice("Clipboard access was blocked. Copy the address bar URL instead.");
-    }
-  }, [source]);
-
   const loadDiagram = (item: SavedDiagram): void => {
     setTitle(item.title);
     setSource(item.source);
@@ -219,7 +193,6 @@ function App() {
         <div className="brand"><span className="brand-mark">↗</span><span>Mermaid <b>Studio</b></span><em>local</em></div>
         <div className="title-input"><label htmlFor="diagram-title">Diagram title</label><input id="diagram-title" value={title} onChange={(event) => setTitle(event.target.value)} maxLength={120} /></div>
         <div className="header-actions">
-          <div className="share-action"><button className="ghost" onClick={share} aria-describedby="share-privacy">Share source</button><span id="share-privacy">Source links include the full diagram text.</span></div>
           <button className="ghost" onClick={saveLocal}>Save library</button>
           <button className="primary" onClick={() => void saveToFolder()}>Save to app folder</button>
         </div>
