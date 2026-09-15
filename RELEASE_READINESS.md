@@ -6,7 +6,7 @@ Status: **ready for an owner-reviewed source release; not yet a tagged release**
 
 ## Release boundary
 
-Mermaid Studio is a local diagram editor for developers and technical writers. The release is this source repository plus its development launchers. It is not a standalone, signed, or notarized Mac application. The canonical repository is `git@github.com:gauravsdama/mermaid-studio-local.git`; the current committed base is `85be21567438f242916078d895d6c56f5f9185e6`.
+Mermaid Studio is a local diagram editor for developers and technical writers. The release is this source repository plus its development launchers. It is not a standalone, signed, or notarized Mac application. The canonical repository is `git@github.com:gauravsdama/mermaid-studio-local.git`; the verified release changes are committed locally through `8912b5f` and have not been pushed.
 
 The first-party source is owned by Gaurav Dama and licensed under MIT. The ignored `upstream/` checkouts were used only as product references. Their exact URLs, reviewed revisions, and license information are recorded in `NOTICES.md`. No reference application source is intentionally included.
 
@@ -23,8 +23,8 @@ The server, browser, and MCP checks use temporary artifact directories and clean
 
 ## Before tagging
 
-1. Review every uncommitted file, then create the release commit. Nothing in this readiness pass was committed or pushed.
-2. Run the pinned GitHub Actions workflow on that commit. Local checks cannot prove the hosted runner result.
+1. Review the local release commits, then push them when publication is approved.
+2. Run the pinned GitHub Actions workflow on the pushed commit. Local checks cannot prove the hosted runner result.
 3. Confirm the copyright name and MIT choice in `LICENSE`, `NOTICE`, `NOTICES.md`, `package.json`, and this file.
 4. Check the native viewer once with VoiceOver. Automated tests verify the same production page in Chromium and verify native process lifecycle, but they do not establish WebKit screen-reader quality.
 5. Record the release commit and retain the workflow result with the screenshot.
