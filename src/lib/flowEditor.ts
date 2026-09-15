@@ -39,6 +39,8 @@ function nodeForId(nodes: SVGGElement[], mermaidId: string): SVGGElement | undef
 }
 
 export function enableFlowEditor(svg: SVGSVGElement): (() => void) | undefined {
+  svg.querySelector("[data-studio-edge-layer]")?.remove();
+  svg.querySelector("[data-studio-handle-layer]")?.remove();
   const nodes = [...svg.querySelectorAll<SVGGElement>("g.node[id]")];
   const originalEdges = [...svg.querySelectorAll<SVGPathElement>("path.flowchart-link[id]")];
   if (!nodes.length || !originalEdges.length) return undefined;
@@ -53,7 +55,7 @@ export function enableFlowEditor(svg: SVGSVGElement): (() => void) | undefined {
   const edges: Edge[] = [];
   const cleanup: Array<() => void> = [];
 
-  for (const original of originalEdges) {
+  for (const [edgeIndex, original] of originalEdges.entries()) {
     const match = (original.getAttribute("data-id") ?? original.id).match(/^L_(.+)_(.+?)_\d+$/);
     if (!match) continue;
     const source = nodeForId(nodes, match[1]);
@@ -68,6 +70,10 @@ export function enableFlowEditor(svg: SVGSVGElement): (() => void) | undefined {
     handle.setAttribute("fill", "#f5a524");
     handle.setAttribute("stroke", "#10211f");
     handle.setAttribute("stroke-width", "2");
+    handle.setAttribute("tabindex", "0");
+    handle.setAttribute("role", "slider");
+    handle.setAttribute("aria-label", `Adjust connector ${edgeIndex + 1}`);
+    handle.setAttribute("aria-valuetext", "Centered");
     handle.style.cursor = "grab";
     edgeLayer.append(path);
     handleLayer.append(handle);
@@ -89,7 +95,27 @@ export function enableFlowEditor(svg: SVGSVGElement): (() => void) | undefined {
       handle.addEventListener("pointerup", onUp, { once: true });
     };
     handle.addEventListener("pointerdown", onPointerDown);
-    cleanup.push(() => handle.removeEventListener("pointerdown", onPointerDown));
+    const onKeyDown = (event: KeyboardEvent) => {
+      const movement = event.shiftKey ? 10 : 2;
+      const delta: Point = { x: 0, y: 0 };
+      if (event.key === "ArrowLeft") delta.x = -movement;
+      else if (event.key === "ArrowRight") delta.x = movement;
+      else if (event.key === "ArrowUp") delta.y = -movement;
+      else if (event.key === "ArrowDown") delta.y = movement;
+      else return;
+      event.preventDefault();
+      const from = center(svg, edge.source);
+      const to = center(svg, edge.target);
+      const current = edge.bend.x === 0 && edge.bend.y === 0 ? { x: (from.x + to.x) / 2, y: (from.y + to.y) / 2 } : edge.bend;
+      edge.bend = { x: current.x + delta.x, y: current.y + delta.y };
+      handle.setAttribute("aria-valuetext", `Offset ${Math.round(edge.bend.x)}, ${Math.round(edge.bend.y)}`);
+      drawEdge(svg, edge);
+    };
+    handle.addEventListener("keydown", onKeyDown);
+    cleanup.push(() => {
+      handle.removeEventListener("pointerdown", onPointerDown);
+      handle.removeEventListener("keydown", onKeyDown);
+    });
   }
   svg.append(edgeLayer, handleLayer);
 
@@ -97,6 +123,10 @@ export function enableFlowEditor(svg: SVGSVGElement): (() => void) | undefined {
     const baseTransform = node.getAttribute("transform") ?? "";
     let offset = { x: 0, y: 0 };
     node.style.cursor = "grab";
+    node.setAttribute("tabindex", "0");
+    node.setAttribute("role", "button");
+    const nodeName = node.textContent?.replace(/\s+/g, " ").trim() || "Flowchart node";
+    node.setAttribute("aria-label", `Move ${nodeName}`);
     const onPointerDown = (event: PointerEvent) => {
       event.preventDefault();
       node.setPointerCapture(event.pointerId);
@@ -118,14 +148,33 @@ export function enableFlowEditor(svg: SVGSVGElement): (() => void) | undefined {
       node.addEventListener("pointerup", onUp, { once: true });
     };
     node.addEventListener("pointerdown", onPointerDown);
-    cleanup.push(() => node.removeEventListener("pointerdown", onPointerDown));
+    const onKeyDown = (event: KeyboardEvent) => {
+      const movement = event.shiftKey ? 10 : 2;
+      if (!['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(event.key)) return;
+      event.preventDefault();
+      if (event.key === "ArrowLeft") offset.x -= movement;
+      else if (event.key === "ArrowRight") offset.x += movement;
+      else if (event.key === "ArrowUp") offset.y -= movement;
+      else offset.y += movement;
+      node.setAttribute("transform", `${baseTransform} translate(${offset.x} ${offset.y})`);
+      node.setAttribute("aria-label", `Move ${nodeName}. Offset ${Math.round(offset.x)}, ${Math.round(offset.y)}`);
+      edges.filter((edge) => edge.source === node || edge.target === node).forEach((edge) => drawEdge(svg, edge));
+    };
+    node.addEventListener("keydown", onKeyDown);
+    cleanup.push(() => {
+      node.removeEventListener("pointerdown", onPointerDown);
+      node.removeEventListener("keydown", onKeyDown);
+    });
   }
 
   return () => {
     cleanup.forEach((dispose) => dispose());
-    edgeLayer.remove();
     handleLayer.remove();
-    originalEdges.forEach((edge) => { edge.style.display = ""; });
-    nodes.forEach((node) => { node.style.cursor = ""; });
+    nodes.forEach((node) => {
+      node.style.cursor = "";
+      node.removeAttribute("tabindex");
+      node.removeAttribute("role");
+      node.removeAttribute("aria-label");
+    });
   };
 }

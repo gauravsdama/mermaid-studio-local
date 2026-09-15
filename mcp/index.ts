@@ -2,16 +2,49 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
+import { readFile } from "node:fs/promises";
+import { isAbsolute, relative, resolve, sep } from "node:path";
 import { callGateway } from "./services/gateway.js";
+import { APP_ROOT, ARTIFACT_ROOT } from "../server/paths.js";
+import { artifactRecordSchema, type ArtifactRecord } from "../server/store.js";
 
 const responseFormat = z.enum(["markdown", "json"]).default("markdown").describe("Use markdown for people or json for programmatic processing.");
 const theme = z.enum(["default", "dark", "forest", "neutral", "base"]).default("default").describe("Mermaid theme used by the headless transparent PNG renderer.");
 
-interface Artifact { id: string; title: string; createdAt: string; pngPath: string; sourcePath: string; svgPath?: string; renderer: "browser" | "cli"; theme: string }
+type Artifact = ArtifactRecord;
 interface ListResponse { total: number; items: Artifact[]; hasMore: boolean; nextOffset?: number }
+const listResponseSchema = z.object({
+  total: z.number().int().nonnegative(),
+  items: z.array(artifactRecordSchema),
+  hasMore: z.boolean(),
+  nextOffset: z.number().int().nonnegative().optional()
+}).strict();
 
 function result(data: object, format: "markdown" | "json", markdown: string) {
-  return { content: [{ type: "text" as const, text: format === "json" ? JSON.stringify(data, null, 2) : markdown },], structuredContent: data as Record<string, unknown> };
+  const content: Array<{ type: "text"; text: string } | { type: "image"; data: string; mimeType: "image/png" }> = [
+    { type: "text", text: format === "json" ? JSON.stringify(data, null, 2) : markdown }
+  ];
+  return { content, structuredContent: data as Record<string, unknown> };
+}
+
+async function imageContent(artifact: Artifact) {
+  artifactRecordSchema.parse(artifact);
+  const path = resolve(APP_ROOT, artifact.pngPath);
+  const relativeToArtifacts = relative(resolve(ARTIFACT_ROOT), path);
+  if (
+    relativeToArtifacts === ".." ||
+    relativeToArtifacts.startsWith(`..${sep}`) ||
+    isAbsolute(relativeToArtifacts) ||
+    !relativeToArtifacts.toLowerCase().endsWith(".png")
+  ) {
+    throw new Error("The artifact preview path is outside Mermaid Studio's artifact directory.");
+  }
+  const data = await readFile(path);
+  return { type: "image" as const, data: data.toString("base64"), mimeType: "image/png" as const };
+}
+
+function artifactMarkdown(artifact: Artifact): string {
+  return `# ${artifact.title}\n\n- PNG: \`${artifact.pngPath}\`\n- SVG: \`${artifact.svgPath ?? "not available"}\`\n- Mermaid source: \`${artifact.sourcePath}\`\n- ID: \`${artifact.id}\``;
 }
 
 const server = new McpServer({ name: "mermaid-studio-mcp-server", version: "0.1.0" });
@@ -30,7 +63,9 @@ server.registerTool("mermaid_studio_create_diagram", {
 }, async ({ title, source, theme: diagramTheme, scale, response_format }) => {
   try {
     const data = await callGateway<{ artifact: Artifact }>("/api/diagrams/render", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ title, source, theme: diagramTheme, scale }) });
-    return result(data, response_format, `# Created ${data.artifact.title}\n\n- PNG: \`${data.artifact.pngPath}\`\n- Mermaid source: \`${data.artifact.sourcePath}\`\n- ID: \`${data.artifact.id}\``);
+    const response = result(data, response_format, artifactMarkdown(data.artifact));
+    response.content.push(await imageContent(data.artifact));
+    return response;
   } catch (cause) {
     return { isError: true, content: [{ type: "text" as const, text: `Error: ${cause instanceof Error ? cause.message : "Could not create the diagram."}` }] };
   }
@@ -43,7 +78,7 @@ server.registerTool("mermaid_studio_list_diagrams", {
   annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false }
 }, async ({ limit, offset, response_format }) => {
   try {
-    const data = await callGateway<ListResponse>(`/api/diagrams?limit=${limit}&offset=${offset}`);
+    const data: ListResponse = listResponseSchema.parse(await callGateway<ListResponse>(`/api/diagrams?limit=${limit}&offset=${offset}`));
     const markdown = data.items.length ? `# Mermaid Studio artifacts\n\n${data.items.map((item) => `- **${item.title}** — \`${item.id}\`\n  - PNG: \`${item.pngPath}\``).join("\n")}` : "No saved Mermaid Studio artifacts yet.";
     return result(data, response_format, markdown);
   } catch (cause) {
@@ -59,9 +94,33 @@ server.registerTool("mermaid_studio_get_diagram", {
 }, async ({ id, response_format }) => {
   try {
     const data = await callGateway<{ artifact: Artifact }>(`/api/diagrams/${id}`);
-    return result(data, response_format, `# ${data.artifact.title}\n\n- PNG: \`${data.artifact.pngPath}\`\n- Mermaid source: \`${data.artifact.sourcePath}\`\n- Renderer: ${data.artifact.renderer}`);
+    const response = result(data, response_format, artifactMarkdown(data.artifact));
+    response.content.push(await imageContent(data.artifact));
+    return response;
   } catch (cause) {
     return { isError: true, content: [{ type: "text" as const, text: `Error: ${cause instanceof Error ? cause.message : "Could not get the diagram."}` }] };
+  }
+});
+
+server.registerTool("mermaid_studio_update_diagram", {
+  title: "Update a Mermaid diagram artifact",
+  description: "Creates a new high-resolution PNG and SVG revision from updated Mermaid source. The original artifact is kept unchanged and the response includes a rendered preview.",
+  inputSchema: {
+    id: z.string().regex(/^[a-zA-Z0-9-]+$/, "Use an ID returned by mermaid_studio_list_diagrams."),
+    source: z.string().min(1).max(200_000).describe("Complete replacement Mermaid source."),
+    theme,
+    scale: z.number().int().min(1).max(4).default(4).describe("PNG scale factor. 4 is high resolution."),
+    response_format: responseFormat
+  },
+  annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false }
+}, async ({ id, source, theme: diagramTheme, scale, response_format }) => {
+  try {
+    const data = await callGateway<{ artifact: Artifact }>(`/api/diagrams/${id}/revisions`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ source, theme: diagramTheme, scale }) });
+    const response = result(data, response_format, `${artifactMarkdown(data.artifact)}\n- Revision of: \`${id}\``);
+    response.content.push(await imageContent(data.artifact));
+    return response;
+  } catch (cause) {
+    return { isError: true, content: [{ type: "text" as const, text: `Error: ${cause instanceof Error ? cause.message : "Could not update the diagram."}` }] };
   }
 });
 

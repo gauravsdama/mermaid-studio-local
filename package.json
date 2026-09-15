@@ -1,6 +1,7 @@
 {
   "name": "mermaid-studio-local",
   "version": "0.1.0",
+  "license": "MIT",
   "private": true,
   "type": "module",
   "description": "A local Mermaid renderer, optional flowchart layout editor, artifact store, and MCP gateway.",
@@ -13,9 +14,14 @@
     "build": "npm run typecheck && vite build && tsc -p tsconfig.server.json",
     "start": "node dist/server/index.js",
     "start:mcp": "node dist/mcp/index.js",
+    "native:viewer": "npm run build && swift run --package-path native/MermaidStudioViewer",
     "test": "npm run typecheck && npm run lint",
     "test:browser": "node scripts/browser-smoke.mjs",
     "test:mcp": "node scripts/mcp-smoke.mjs",
+    "test:native": "swift build --package-path native/MermaidStudioViewer && node scripts/native-lifecycle.mjs",
+    "test:server": "node scripts/server-smoke.mjs",
+    "test:copy": "node scripts/check-ui-copy.mjs",
+    "test:release": "npm run test && npm run build && npm run test:copy && npm run test:server && npm run test:browser && npm run test:mcp",
     "lint": "eslint ."
   },
   "engines": {

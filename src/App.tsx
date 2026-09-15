@@ -16,7 +16,8 @@ const THEMES: DiagramTheme[] = ["default", "dark", "forest", "neutral", "base"];
 
 function readSharedDiagram(): string | undefined {
   try {
-    const encoded = new URLSearchParams(window.location.search).get("diagram");
+    const fragment = window.location.hash.startsWith("#") ? window.location.hash.slice(1) : window.location.hash;
+    const encoded = new URLSearchParams(fragment).get("diagram") ?? new URLSearchParams(window.location.search).get("diagram");
     return encoded ? decodeURIComponent(escape(atob(encoded))) : undefined;
   } catch {
     return undefined;
@@ -69,12 +70,33 @@ function App() {
   }, [source, theme]);
 
   useEffect(() => {
+    const svg = renderHost.current?.querySelector<SVGSVGElement>("svg");
+    if (!svg) return;
+    const type = source.trim().split(/\s|\n/, 1)[0]?.replace(/-v\d+$/i, "") || "diagram";
+    const titleId = "mermaid-studio-svg-title";
+    const descriptionId = "mermaid-studio-svg-description";
+    svg.querySelector(`#${titleId}`)?.remove();
+    svg.querySelector(`#${descriptionId}`)?.remove();
+    const svgTitle = document.createElementNS("http://www.w3.org/2000/svg", "title");
+    svgTitle.id = titleId;
+    svgTitle.textContent = title;
+    const description = document.createElementNS("http://www.w3.org/2000/svg", "desc");
+    description.id = descriptionId;
+    description.textContent = `${title}. Mermaid ${type} diagram.`;
+    svg.prepend(description);
+    svg.prepend(svgTitle);
+    svg.setAttribute("role", "img");
+    svg.setAttribute("aria-labelledby", `${titleId} ${descriptionId}`);
+    svg.setAttribute("focusable", "false");
+  }, [source, svgMarkup, title]);
+
+  useEffect(() => {
     if (!editing || !renderHost.current) return;
     const svg = renderHost.current.querySelector<SVGSVGElement>("svg");
     if (!svg) return;
     const dispose = enableFlowEditor(svg);
     if (!dispose) {
-      setNotice("Freeform editing currently supports flowcharts with named nodes and arrows.");
+      setNotice("Layout editing supports flowcharts with named nodes and arrows.");
       setEditing(false);
       return;
     }
@@ -97,6 +119,16 @@ function App() {
   }, []);
 
   const exportSvg = useCallback(() => cleanSvgForExport(getSvg()), [getSvg]);
+
+  const toggleLayoutEditing = useCallback(() => {
+    if (editing) {
+      setSvgMarkup(exportSvg());
+      setEditing(false);
+      setNotice("Preview updated");
+      return;
+    }
+    setEditing(true);
+  }, [editing, exportSvg]);
 
   const buildPng = useCallback(async () => svgToPngDataUrl(exportSvg(), 4), [exportSvg]);
 
@@ -146,10 +178,11 @@ function App() {
 
   const share = useCallback(async () => {
     const url = new URL(window.location.href);
-    url.search = `diagram=${encodeURIComponent(encodeDiagram(source))}`;
+    url.search = "";
+    url.hash = `diagram=${encodeURIComponent(encodeDiagram(source))}`;
     try {
       await navigator.clipboard.writeText(url.toString());
-      setNotice("A shareable source link is on your clipboard");
+      setNotice("Copied source link. Anyone with it can read the diagram text.");
     } catch {
       setNotice("Clipboard access was blocked. Copy the address bar URL instead.");
     }
@@ -186,7 +219,7 @@ function App() {
         <div className="brand"><span className="brand-mark">↗</span><span>Mermaid <b>Studio</b></span><em>local</em></div>
         <div className="title-input"><label htmlFor="diagram-title">Diagram title</label><input id="diagram-title" value={title} onChange={(event) => setTitle(event.target.value)} maxLength={120} /></div>
         <div className="header-actions">
-          <button className="ghost" onClick={share}>Share source</button>
+          <div className="share-action"><button className="ghost" onClick={share} aria-describedby="share-privacy">Share source</button><span id="share-privacy">Source links include the full diagram text.</span></div>
           <button className="ghost" onClick={saveLocal}>Save library</button>
           <button className="primary" onClick={() => void saveToFolder()}>Save to app folder</button>
         </div>
@@ -223,21 +256,21 @@ function App() {
         </aside>
 
         <section className="editor-pane">
-          <div className="pane-heading"><div><p className="eyebrow">Source</p><h1>Write the diagram</h1></div><span className={error ? "status error" : "status"}>{error ? "Fix syntax" : "Live"}</span></div>
+          <div className="pane-heading"><div><p className="eyebrow">Source</p><h1>Write the diagram</h1></div><span className={error ? "status error" : "status"} aria-live="polite">{error ? "Fix syntax" : "Live"}</span></div>
           <textarea aria-label="Mermaid code" spellCheck="false" value={source} onChange={(event) => setSource(event.target.value)} />
           <div className="editor-footer"><span>⌘/Ctrl + S library · ⇧⌘/Ctrl + S SVG · ⇧⌘/Ctrl + P PNG</span><button className="text-button" onClick={() => { setSource(STARTER); setTitle("Untitled diagram"); }}>Reset</button></div>
         </section>
 
         <section className="preview-pane" ref={previewPanel}>
-          <div className="pane-heading"><div><p className="eyebrow">Canvas</p><h1>See the structure</h1></div><span className="status">{notice}</span></div>
+          <div className="pane-heading"><div><p className="eyebrow">Canvas</p><h1>See the structure</h1></div><span className="status" aria-live="polite" aria-atomic="true">{notice}</span></div>
           <div className="preview-controls">
             <div className="zoom-controls"><button onClick={() => setZoom((value) => Math.max(0.35, value - 0.15))} aria-label="Zoom out">−</button><span>{Math.round(zoom * 100)}%</span><button onClick={() => setZoom((value) => Math.min(2.5, value + 0.15))} aria-label="Zoom in">+</button><button onClick={() => setZoom(1)}>Reset zoom</button></div>
-            <div className="canvas-actions"><button className={editing ? "active" : ""} disabled={!isFlowchart || !!error} onClick={() => setEditing((value) => !value)}>{editing ? "Exit layout edit" : "Edit layout"}</button><button onClick={() => void previewPanel.current?.requestFullscreen?.()}>Fullscreen</button></div>
+            <div className="canvas-actions"><button className={editing ? "active" : ""} disabled={!isFlowchart || !!error} onClick={toggleLayoutEditing}>{editing ? "Finish layout" : "Edit layout"}</button><button onClick={() => void previewPanel.current?.requestFullscreen?.()}>Fullscreen</button></div>
           </div>
-          {editing && <p className="editor-banner">Freeform mode is open. Drag boxes and amber arrow handles; export before exiting to retain the adjusted SVG.</p>}
+          {editing && <p className="editor-banner">Drag nodes and amber connectors. Arrow keys move the focused item; hold Shift for larger steps.</p>}
           {isSequence && sequenceTotal > 0 && <div className="sequence-controls"><span>Sequence walkthrough</span><input aria-label="Sequence step" type="range" min="0" max={sequenceTotal} value={sequenceStep} onChange={(event) => setSequenceStep(Number(event.target.value))} /><span>{sequenceStep || "all"}/{sequenceTotal}</span></div>}
           <div className="canvas-scroll"><div className="diagram-stage" style={{ transform: `scale(${zoom})` }} ref={renderHost} dangerouslySetInnerHTML={{ __html: svgMarkup }} /></div>
-          {error && <div className="render-error"><b>Mermaid could not render this draft.</b><span>{error}</span></div>}
+          {error && <div className="render-error" role="alert"><b>Mermaid could not render this draft.</b><span>{error}</span></div>}
           <div className="export-bar"><button onClick={() => downloadText(filenameFor(title, "svg"), exportSvg(), "image/svg+xml")}>Download SVG</button><button className="primary" onClick={() => void downloadPng()}>Download transparent PNG · 4×</button></div>
         </section>
       </section>
