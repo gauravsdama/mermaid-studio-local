@@ -35,11 +35,11 @@ try {
   await page.goto(`http://127.0.0.1:${port}${basePath}`, { waitUntil: "networkidle" });
   await page.locator(".diagram-stage svg").waitFor();
   const prompts = [
-    ["Map a checkout request", "Checkout service flow"],
-    ["Trace an incident handoff", "Incident response sequence"],
-    ["Model release data", "Release data model"],
-    ["Plan a launch timeline", "Launch timeline"],
-    ["Show order states", "Order state machine"]
+    ["Create a flowchart for checkout from cart review through payment confirmation.", "Checkout service flow"],
+    ["Create a sequence diagram for an incident alert, escalation, mitigation, and recovery.", "Incident response sequence"],
+    ["Create an entity relationship diagram for releases, artifacts, checks, and checksums.", "Release data model"],
+    ["Create a timeline for source freeze, release candidate testing, publishing, and follow-up.", "Launch timeline"],
+    ["Create a state diagram for an order from draft through fulfillment or cancellation.", "Order state machine"]
   ];
   if (await page.locator(".demo-list button").count() !== prompts.length) throw new Error("Static demo did not expose exactly five prompts.");
   if (await page.getByRole("button", { name: "Save to app folder" }).count()) throw new Error("Static demo exposed the unavailable backend save action.");
@@ -50,7 +50,7 @@ try {
     await page.locator(".diagram-stage svg").waitFor({ state: "visible" });
   }
   if (backendRequests.length) throw new Error(`Static demo attempted backend requests: ${backendRequests.join(", ")}`);
-  console.log("static demo smoke passed; five simulated prompts rendered without a backend");
+  console.log("static demo smoke passed; five example requests rendered");
 } finally {
   await browser.close();
   await new Promise((resolveClose) => server.close(resolveClose));

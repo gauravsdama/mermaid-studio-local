@@ -9,7 +9,7 @@ export type DemoPrompt = {
 
 export const demoPrompts: DemoPrompt[] = [
   {
-    label: "Map a checkout request",
+    label: "Create a flowchart for checkout from cart review through payment confirmation.",
     title: "Checkout service flow",
     theme: "base",
     source: `flowchart LR
@@ -20,7 +20,7 @@ export const demoPrompts: DemoPrompt[] = [
   Payment --> Receipt[Confirm order]`
   },
   {
-    label: "Trace an incident handoff",
+    label: "Create a sequence diagram for an incident alert, escalation, mitigation, and recovery.",
     title: "Incident response sequence",
     theme: "default",
     source: `sequenceDiagram
@@ -33,7 +33,7 @@ export const demoPrompts: DemoPrompt[] = [
   OnCall-->>Monitor: Confirm recovery`
   },
   {
-    label: "Model release data",
+    label: "Create an entity relationship diagram for releases, artifacts, checks, and checksums.",
     title: "Release data model",
     theme: "forest",
     source: `erDiagram
@@ -50,7 +50,7 @@ export const demoPrompts: DemoPrompt[] = [
   }`
   },
   {
-    label: "Plan a launch timeline",
+    label: "Create a timeline for source freeze, release candidate testing, publishing, and follow-up.",
     title: "Launch timeline",
     theme: "neutral",
     source: `timeline
@@ -61,7 +61,7 @@ export const demoPrompts: DemoPrompt[] = [
   Follow-up : Gather compatibility reports`
   },
   {
-    label: "Show order states",
+    label: "Create a state diagram for an order from draft through fulfillment or cancellation.",
     title: "Order state machine",
     theme: "dark",
     source: `stateDiagram-v2

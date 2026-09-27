@@ -24,7 +24,7 @@ Then open `http://127.0.0.1:8787`.
 
 ## Static demo
 
-The [GitHub Pages demo](https://gauravsdama.github.io/mermaid-studio-local/) presents five simulated prompts. `npm run test:demo` builds the same variant under `dist-demo/` and exercises every prompt in a real browser. The demo is intentionally client-only: each prompt loads a deterministic example, and no model, API server, or app-folder save action is presented.
+The [GitHub Pages demo](https://gauravsdama.github.io/mermaid-studio-local/) presents five example diagram requests. `npm run test:demo` builds the same variant under `dist-demo/` and exercises every request in a real browser.
 
 ## Optional layout editor
 

@@ -27,8 +27,11 @@ All Mermaid diagram types render live. The optional freeform editor is intention
 - No network API is required for preview, local history, library, SVG export, or browser PNG export.
 - The UI editor is dormant until **Edit layout** is selected. It only adds drag listeners and SVG overlays in that mode.
 - The API binds to `127.0.0.1`; remote callers cannot write arbitrary paths. Artifact filenames are generated internally from a sanitized title plus a UUID.
-- Headless work is admitted according to the machine's available CPU count, with a small bounded queue. One render request produces PNG and SVG concurrently, so a busy local machine cannot accumulate an unbounded set of browser processes.
+- Headless work is admitted according to the machine's available CPU count, with a small bounded queue and a five-minute hard ceiling. Disconnecting clients cancel queued or active work.
+- One render request launches one Chromium instance. It renders SVG first, checks the scaled dimensions against the PNG pixel budget, and then renders PNG in a second page of the same browser. This avoids two concurrent Chromium processes and rejects oversized screenshots before their pixel buffers are allocated.
 - Stored metadata is parsed against a strict schema. Every stored path must remain under the configured artifact root and match the record ID and expected extension.
+- Artifact files are written to same-directory staging names and promoted with metadata last. Readers treat metadata as the commit marker, and caught write failures remove both staged and promoted files.
+- The MCP client checks the gateway's identity and API version before sending Mermaid source. It refuses non-loopback gateway URLs and unrelated services on the configured port.
 
 ## Known operational requirement
 

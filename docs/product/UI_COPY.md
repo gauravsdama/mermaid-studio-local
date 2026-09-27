@@ -4,24 +4,24 @@ This file is the human-owned source of truth for visible and assistive copy. Kee
 
 | Stable ID | Surface | Approved text | Implementation |
 |---|---|---|---|
-| `app.brand` | Header | Mermaid Studio / local; Mermaid Studio / demo | `src/App.tsx` |
+| `app.brand` | Header | Mermaid Studio; Mermaid Studio / local | `src/App.tsx` |
 | `diagram.title.default` | New draft | Untitled diagram | `src/App.tsx` |
 | `diagram.title.label` | Header field | Diagram title | `src/App.tsx` |
 | `library.save` | Header | Save library | `src/App.tsx` |
 | `folder.save` | Header | Save to app folder | `src/App.tsx` |
 | `sidebar.label` | Navigation | Diagram tools | `src/App.tsx` |
-| `preset.group` | Sidebar | Starting point | `src/App.tsx` |
+| `preset.group` | Sidebar | Style | `src/App.tsx` |
 | `preset.label` | Sidebar control | Preset diagrams | `src/App.tsx` |
 | `preset.placeholder` | Sidebar control | Choose a preset… | `src/App.tsx` |
 | `preset.names` | Sidebar options | Product flow / API sequence / Release plan / Service map / Decision tree | `src/data/presets.ts` |
-| `demo.group` | Static demo sidebar | Simulated prompts | `src/App.tsx` |
-| `demo.note` | Static demo sidebar | Each prompt loads a local example. No model or backend is running. | `src/App.tsx` |
-| `demo.prompt.checkout` | Static demo action | Map a checkout request | `src/data/demoPrompts.ts` |
-| `demo.prompt.incident` | Static demo action | Trace an incident handoff | `src/data/demoPrompts.ts` |
-| `demo.prompt.release` | Static demo action | Model release data | `src/data/demoPrompts.ts` |
-| `demo.prompt.launch` | Static demo action | Plan a launch timeline | `src/data/demoPrompts.ts` |
-| `demo.prompt.order` | Static demo action | Show order states | `src/data/demoPrompts.ts` |
-| `demo.loaded` | Static demo status | Loaded demo prompt “{prompt}” | `src/App.tsx` |
+| `demo.group` | Static demo sidebar | Diagram request | `src/App.tsx` |
+| `demo.note` | Static demo sidebar | Choose a request to load its diagram. | `src/App.tsx` |
+| `demo.prompt.checkout` | Static demo action | Create a flowchart for checkout from cart review through payment confirmation. | `src/data/demoPrompts.ts` |
+| `demo.prompt.incident` | Static demo action | Create a sequence diagram for an incident alert, escalation, mitigation, and recovery. | `src/data/demoPrompts.ts` |
+| `demo.prompt.release` | Static demo action | Create an entity relationship diagram for releases, artifacts, checks, and checksums. | `src/data/demoPrompts.ts` |
+| `demo.prompt.launch` | Static demo action | Create a timeline for source freeze, release candidate testing, publishing, and follow-up. | `src/data/demoPrompts.ts` |
+| `demo.prompt.order` | Static demo action | Create a state diagram for an order from draft through fulfillment or cancellation. | `src/data/demoPrompts.ts` |
+| `demo.loaded` | Static demo status | Loaded “{title}” | `src/App.tsx` |
 | `settings.group` | Sidebar | Render settings | `src/App.tsx` |
 | `theme.label` | Sidebar control | Mermaid theme | `src/App.tsx` |
 | `export.note` | Sidebar | Exports always use a transparent canvas at 4× resolution. | `src/App.tsx` |

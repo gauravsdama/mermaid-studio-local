@@ -1,4 +1,4 @@
-type Point = { x: number; y: number };
+import { arrowKeyDelta, edgeControlPoint, projectClientPoint, type Point } from "./flowGeometry";
 
 interface Edge {
   id: string;
@@ -12,12 +12,7 @@ interface Edge {
 const SVG_NS = "http://www.w3.org/2000/svg";
 
 function pointInSvg(svg: SVGSVGElement, clientX: number, clientY: number): Point {
-  const rect = svg.getBoundingClientRect();
-  const box = svg.viewBox.baseVal;
-  return {
-    x: box.x + ((clientX - rect.left) / rect.width) * box.width,
-    y: box.y + ((clientY - rect.top) / rect.height) * box.height
-  };
+  return projectClientPoint(clientX, clientY, svg.getBoundingClientRect(), svg.viewBox.baseVal);
 }
 
 function center(svg: SVGSVGElement, node: SVGGElement): Point {
@@ -28,7 +23,7 @@ function center(svg: SVGSVGElement, node: SVGGElement): Point {
 function drawEdge(svg: SVGSVGElement, edge: Edge): void {
   const from = center(svg, edge.source);
   const to = center(svg, edge.target);
-  const control = edge.bend.x === 0 && edge.bend.y === 0 ? { x: (from.x + to.x) / 2, y: (from.y + to.y) / 2 } : edge.bend;
+  const control = edgeControlPoint(from, to, edge.bend);
   edge.path.setAttribute("d", `M ${from.x} ${from.y} Q ${control.x} ${control.y} ${to.x} ${to.y}`);
   edge.handle.setAttribute("cx", String(control.x));
   edge.handle.setAttribute("cy", String(control.y));
@@ -80,39 +75,43 @@ export function enableFlowEditor(svg: SVGSVGElement): (() => void) | undefined {
     const edge: Edge = { id: original.id, source, target, path, handle, bend: { x: 0, y: 0 } };
     edges.push(edge);
     drawEdge(svg, edge);
+    let stopActiveDrag: (() => void) | undefined;
     const onPointerDown = (event: PointerEvent) => {
       event.preventDefault();
+      stopActiveDrag?.();
       handle.setPointerCapture(event.pointerId);
       const onMove = (move: PointerEvent) => {
         edge.bend = pointInSvg(svg, move.clientX, move.clientY);
         drawEdge(svg, edge);
       };
-      const onUp = () => {
+      const onFinish = () => {
         handle.removeEventListener("pointermove", onMove);
-        handle.removeEventListener("pointerup", onUp);
+        handle.removeEventListener("pointerup", onFinish);
+        handle.removeEventListener("pointercancel", onFinish);
+        handle.removeEventListener("lostpointercapture", onFinish);
+        stopActiveDrag = undefined;
       };
+      stopActiveDrag = onFinish;
       handle.addEventListener("pointermove", onMove);
-      handle.addEventListener("pointerup", onUp, { once: true });
+      handle.addEventListener("pointerup", onFinish, { once: true });
+      handle.addEventListener("pointercancel", onFinish, { once: true });
+      handle.addEventListener("lostpointercapture", onFinish, { once: true });
     };
     handle.addEventListener("pointerdown", onPointerDown);
     const onKeyDown = (event: KeyboardEvent) => {
-      const movement = event.shiftKey ? 10 : 2;
-      const delta: Point = { x: 0, y: 0 };
-      if (event.key === "ArrowLeft") delta.x = -movement;
-      else if (event.key === "ArrowRight") delta.x = movement;
-      else if (event.key === "ArrowUp") delta.y = -movement;
-      else if (event.key === "ArrowDown") delta.y = movement;
-      else return;
+      const delta = arrowKeyDelta(event.key, event.shiftKey);
+      if (!delta) return;
       event.preventDefault();
       const from = center(svg, edge.source);
       const to = center(svg, edge.target);
-      const current = edge.bend.x === 0 && edge.bend.y === 0 ? { x: (from.x + to.x) / 2, y: (from.y + to.y) / 2 } : edge.bend;
+      const current = edgeControlPoint(from, to, edge.bend);
       edge.bend = { x: current.x + delta.x, y: current.y + delta.y };
       handle.setAttribute("aria-valuetext", `Offset ${Math.round(edge.bend.x)}, ${Math.round(edge.bend.y)}`);
       drawEdge(svg, edge);
     };
     handle.addEventListener("keydown", onKeyDown);
     cleanup.push(() => {
+      stopActiveDrag?.();
       handle.removeEventListener("pointerdown", onPointerDown);
       handle.removeEventListener("keydown", onKeyDown);
     });
@@ -122,13 +121,20 @@ export function enableFlowEditor(svg: SVGSVGElement): (() => void) | undefined {
   for (const node of nodes) {
     const baseTransform = node.getAttribute("transform") ?? "";
     let offset = { x: 0, y: 0 };
+    const originalCursor = node.style.cursor;
+    const originalTabindex = node.getAttribute("tabindex");
+    const originalRole = node.getAttribute("role");
+    const originalAriaLabel = node.getAttribute("aria-label");
+    node.setAttribute("data-studio-node", "true");
     node.style.cursor = "grab";
     node.setAttribute("tabindex", "0");
     node.setAttribute("role", "button");
     const nodeName = node.textContent?.replace(/\s+/g, " ").trim() || "Flowchart node";
     node.setAttribute("aria-label", `Move ${nodeName}`);
+    let stopActiveDrag: (() => void) | undefined;
     const onPointerDown = (event: PointerEvent) => {
       event.preventDefault();
+      stopActiveDrag?.();
       node.setPointerCapture(event.pointerId);
       const start = pointInSvg(svg, event.clientX, event.clientY);
       const startingOffset = { ...offset };
@@ -139,31 +145,40 @@ export function enableFlowEditor(svg: SVGSVGElement): (() => void) | undefined {
         node.setAttribute("transform", `${baseTransform} translate(${offset.x} ${offset.y})`);
         edges.filter((edge) => edge.source === node || edge.target === node).forEach((edge) => drawEdge(svg, edge));
       };
-      const onUp = () => {
+      const onFinish = () => {
         node.style.cursor = "grab";
         node.removeEventListener("pointermove", onMove);
-        node.removeEventListener("pointerup", onUp);
+        node.removeEventListener("pointerup", onFinish);
+        node.removeEventListener("pointercancel", onFinish);
+        node.removeEventListener("lostpointercapture", onFinish);
+        stopActiveDrag = undefined;
       };
+      stopActiveDrag = onFinish;
       node.addEventListener("pointermove", onMove);
-      node.addEventListener("pointerup", onUp, { once: true });
+      node.addEventListener("pointerup", onFinish, { once: true });
+      node.addEventListener("pointercancel", onFinish, { once: true });
+      node.addEventListener("lostpointercapture", onFinish, { once: true });
     };
     node.addEventListener("pointerdown", onPointerDown);
     const onKeyDown = (event: KeyboardEvent) => {
-      const movement = event.shiftKey ? 10 : 2;
-      if (!['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(event.key)) return;
+      const delta = arrowKeyDelta(event.key, event.shiftKey);
+      if (!delta) return;
       event.preventDefault();
-      if (event.key === "ArrowLeft") offset.x -= movement;
-      else if (event.key === "ArrowRight") offset.x += movement;
-      else if (event.key === "ArrowUp") offset.y -= movement;
-      else offset.y += movement;
+      offset.x += delta.x;
+      offset.y += delta.y;
       node.setAttribute("transform", `${baseTransform} translate(${offset.x} ${offset.y})`);
       node.setAttribute("aria-label", `Move ${nodeName}. Offset ${Math.round(offset.x)}, ${Math.round(offset.y)}`);
       edges.filter((edge) => edge.source === node || edge.target === node).forEach((edge) => drawEdge(svg, edge));
     };
     node.addEventListener("keydown", onKeyDown);
     cleanup.push(() => {
+      stopActiveDrag?.();
       node.removeEventListener("pointerdown", onPointerDown);
       node.removeEventListener("keydown", onKeyDown);
+      node.style.cursor = originalCursor;
+      if (originalTabindex === null) node.removeAttribute("tabindex"); else node.setAttribute("tabindex", originalTabindex);
+      if (originalRole === null) node.removeAttribute("role"); else node.setAttribute("role", originalRole);
+      if (originalAriaLabel === null) node.removeAttribute("aria-label"); else node.setAttribute("aria-label", originalAriaLabel);
     });
   }
 
@@ -171,10 +186,7 @@ export function enableFlowEditor(svg: SVGSVGElement): (() => void) | undefined {
     cleanup.forEach((dispose) => dispose());
     handleLayer.remove();
     nodes.forEach((node) => {
-      node.style.cursor = "";
-      node.removeAttribute("tabindex");
-      node.removeAttribute("role");
-      node.removeAttribute("aria-label");
+      node.removeAttribute("data-studio-node");
     });
   };
 }

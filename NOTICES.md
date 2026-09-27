@@ -13,6 +13,7 @@ The installed dependency tree is fixed by `package-lock.json`. The direct runtim
 | `cors` | 2.8.6 | MIT | https://github.com/expressjs/cors |
 | `express` | 5.2.1 | MIT | https://github.com/expressjs/express |
 | `mermaid` | 11.17.2 | MIT | https://github.com/mermaid-js/mermaid |
+| `puppeteer` | 25.3.0 | Apache-2.0 | https://github.com/puppeteer/puppeteer |
 | `react` | 19.2.7 | MIT | https://github.com/facebook/react |
 | `react-dom` | 19.2.7 | MIT | https://github.com/facebook/react |
 | `zod` | 3.25.76 | MIT | https://github.com/colinhacks/zod |

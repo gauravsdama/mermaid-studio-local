@@ -11,7 +11,7 @@ const [inventory, app, editor, styles, demoPrompts] = await Promise.all([
 const approved = [
   ["diagram.title.default", "Untitled diagram"], ["diagram.title.label", "Diagram title"],
   ["library.save", "Save library"], ["folder.save", "Save to app folder"],
-  ["preset.group", "Starting point"], ["preset.placeholder", "Choose a preset…"],
+  ["preset.group", "Style"], ["preset.placeholder", "Choose a preset…"],
   ["settings.group", "Render settings"], ["theme.label", "Mermaid theme"],
   ["library.heading", "Library"], ["history.heading", "Recent work"],
   ["source.heading", "Write the diagram"], ["source.label", "Mermaid code"],
@@ -29,11 +29,11 @@ for (const [id, pattern] of [["layout.node", "Move ${nodeName}"], ["layout.conne
   if (!inventory.includes(`| \`${id}\``) || !editor.includes(pattern)) throw new Error(`Flow editor is missing ${id}: ${pattern}`);
 }
 for (const [id, text] of [
-  ["demo.prompt.checkout", "Map a checkout request"],
-  ["demo.prompt.incident", "Trace an incident handoff"],
-  ["demo.prompt.release", "Model release data"],
-  ["demo.prompt.launch", "Plan a launch timeline"],
-  ["demo.prompt.order", "Show order states"]
+  ["demo.prompt.checkout", "Create a flowchart for checkout from cart review through payment confirmation."],
+  ["demo.prompt.incident", "Create a sequence diagram for an incident alert, escalation, mitigation, and recovery."],
+  ["demo.prompt.release", "Create an entity relationship diagram for releases, artifacts, checks, and checksums."],
+  ["demo.prompt.launch", "Create a timeline for source freeze, release candidate testing, publishing, and follow-up."],
+  ["demo.prompt.order", "Create a state diagram for an order from draft through fulfillment or cancellation."]
 ]) {
   if (!inventory.includes(`| \`${id}\``) || !demoPrompts.includes(text)) throw new Error(`Static demo copy is missing ${id}: ${text}`);
 }

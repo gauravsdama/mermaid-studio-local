@@ -10,7 +10,7 @@
     "dev:web": "vite",
     "dev:api": "tsx watch server/index.ts",
     "mcp": "tsx mcp/index.ts",
-    "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.server.json",
+    "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.server.json && tsc --noEmit -p tsconfig.tests.json",
     "build": "npm run typecheck && vite build && tsc -p tsconfig.server.json",
     "build:demo": "VITE_STATIC_DEMO=true VITE_BASE_PATH=/mermaid-studio-local/ VITE_OUT_DIR=dist-demo vite build",
     "start": "node dist/server/index.js",
@@ -18,12 +18,13 @@
     "native:viewer": "npm run build && swift run --package-path native/MermaidStudioViewer",
     "test": "npm run typecheck && npm run lint",
     "test:browser": "node scripts/browser-smoke.mjs",
+    "test:contracts": "tsx --test tests/*.test.ts",
     "test:mcp": "node scripts/mcp-smoke.mjs",
     "test:native": "swift build --package-path native/MermaidStudioViewer && node scripts/native-lifecycle.mjs",
     "test:server": "node scripts/server-smoke.mjs",
     "test:copy": "node scripts/check-ui-copy.mjs",
     "test:demo": "npm run build:demo && node scripts/demo-smoke.mjs",
-    "test:release": "npm run test && npm run build && npm run test:copy && npm run test:server && npm run test:browser && npm run test:mcp && npm run test:demo",
+    "test:release": "npm run test && npm run test:contracts && npm run build && npm run test:copy && npm run test:server && npm run test:browser && npm run test:mcp && npm run test:demo",
     "lint": "eslint ."
   },
   "engines": {
@@ -35,6 +36,7 @@
     "cors": "^2.8.5",
     "express": "^5.1.0",
     "mermaid": "^11.12.1",
+    "puppeteer": "^25.3.0",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
     "zod": "^3.24.2"

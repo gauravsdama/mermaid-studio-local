@@ -7,7 +7,7 @@ import tseslint from "typescript-eslint";
 export default [
   { ignores: ["dist", "upstream", "artifacts", "node_modules"] },
   {
-    files: ["src/**/*.{ts,tsx}", "server/**/*.ts", "mcp/**/*.ts"],
+    files: ["src/**/*.{ts,tsx}", "server/**/*.ts", "mcp/**/*.ts", "shared/**/*.ts", "tests/**/*.ts"],
     languageOptions: { parser: tseslint.parser, globals: { ...globals.browser, ...globals.node } },
     plugins: { "react-hooks": reactHooks, "react-refresh": reactRefresh },
     rules: { ...js.configs.recommended.rules, ...reactHooks.configs.recommended.rules, "no-undef": "off" }

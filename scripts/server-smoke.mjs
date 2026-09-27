@@ -25,7 +25,7 @@ async function json(path, init) {
 
 try {
   const health = await json("/health");
-  if (!health.response.ok || health.body.service !== "mermaid-studio-api" || health.body.renderCapacity.concurrent < 1) throw new Error("Health response did not describe the local render capacity.");
+  if (!health.response.ok || health.body.service !== "mermaid-studio-api" || health.body.gatewayIdentity !== "mermaid-studio-local-gateway" || health.body.apiVersion !== 1 || health.body.renderCapacity.concurrent < 1) throw new Error("Health response did not prove the gateway identity and local render capacity.");
 
   const hostileHost = await rawStatus({ host: "example.com" });
   if (hostileHost !== 403) throw new Error(`Host guard returned ${hostileHost}, expected 403.`);
@@ -38,6 +38,12 @@ try {
   if (oversized.response.status !== 400) throw new Error(`Oversized Mermaid returned ${oversized.response.status}, expected 400.`);
   const invalidPng = await json("/api/diagrams", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ title: "Not a PNG", source: "flowchart LR\nA-->B", theme: "default", pngDataUrl: "data:image/png;base64,bm90LXBuZw==" }) });
   if (invalidPng.response.status !== 400) throw new Error(`Invalid PNG returned ${invalidPng.response.status}, expected 400.`);
+  const oversizedHeader = Buffer.alloc(24);
+  Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]).copy(oversizedHeader);
+  oversizedHeader.writeUInt32BE(9_000, 16);
+  oversizedHeader.writeUInt32BE(100, 20);
+  const oversizedPng = await json("/api/diagrams", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ title: "Too many pixels", source: "flowchart LR\nA-->B", theme: "default", pngDataUrl: `data:image/png;base64,${oversizedHeader.toString("base64")}` }) });
+  if (oversizedPng.response.status !== 400) throw new Error(`Oversized PNG returned ${oversizedPng.response.status}, expected 400.`);
   const traversal = await fetch(`${fixture.baseUrl}/api/diagrams/..%2F..%2Fetc%2Fpasswd`);
   if (traversal.status !== 404) throw new Error(`Path traversal returned ${traversal.status}, expected 404.`);
 
@@ -55,12 +61,14 @@ try {
     const height = png.readUInt32BE(20);
     const colorType = png[25];
     if (width < 2 || height < 2 || ![4, 6].includes(colorType)) throw new Error(`${title} PNG did not retain useful dimensions and alpha support.`);
+    if (width > 8_192 || height > 8_192 || width * height > 16_777_216) throw new Error(`${title} PNG exceeded the renderer pixel budget.`);
     const svg = await readFile(join(process.cwd(), artifact.svgPath), "utf8");
     if (!svg.includes("<svg") || !svg.includes("transparent") && !svg.includes("background-color: transparent")) throw new Error(`${title} SVG was missing expected SVG or transparent output.`);
   }
 
   const listing = await json("/api/diagrams?limit=2&offset=0");
   if (listing.body.items.length !== 2 || listing.body.total !== 3 || listing.body.nextOffset !== 2) throw new Error("Artifact pagination returned the wrong page metadata.");
+  if ((await readdir(fixture.artifactRoot)).some((name) => name.endsWith(".tmp"))) throw new Error("Successful persistence left transaction staging files behind.");
 
   const maliciousId = "zzzz-malicious-record";
   await writeFile(join(fixture.artifactRoot, `${maliciousId}.json`), JSON.stringify({
@@ -74,6 +82,8 @@ try {
   }));
   const malicious = await json(`/api/diagrams/${maliciousId}`);
   if (malicious.response.status !== 500) throw new Error(`Malformed metadata returned ${malicious.response.status}, expected rejection.`);
+  const resilientListing = await json("/api/diagrams?limit=10&offset=0");
+  if (resilientListing.body.total !== 4 || resilientListing.body.items.some((item) => item.id === maliciousId)) throw new Error("Artifact listing did not isolate malformed metadata.");
   console.log("server smoke passed; guards, schema, pagination, malformed input, and three export types verified");
 } finally {
   await fixture.stop();

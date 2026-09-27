@@ -1,64 +1,75 @@
-import { execFile } from "node:child_process";
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
 import { availableParallelism } from "node:os";
-import { join } from "node:path";
-import { promisify } from "node:util";
+import { renderMermaid } from "@mermaid-js/mermaid-cli";
+import puppeteer, { type Browser } from "puppeteer";
 import { APP_ROOT } from "./paths.js";
+import { assertPixelBudget, assertPngWithinLimits } from "./png.js";
+import type { DiagramTheme } from "../shared/contracts.js";
+import { RenderQueue } from "./renderQueue.js";
 
-const execFileAsync = promisify(execFile);
 const renderConcurrency = Math.min(3, Math.max(1, Math.floor(availableParallelism() / 4)));
 const maxQueuedRenders = renderConcurrency * 4;
 const configuredTimeout = Number(process.env.MERMAID_STUDIO_RENDER_TIMEOUT_MS ?? 60_000);
-const renderTimeoutMs = Number.isFinite(configuredTimeout) ? Math.max(1, Math.floor(configuredTimeout)) : 60_000;
-let activeRenders = 0;
-const waiting: Array<() => void> = [];
+const renderTimeoutMs = Number.isFinite(configuredTimeout) ? Math.min(300_000, Math.max(1, Math.floor(configuredTimeout))) : 60_000;
+const renderQueue = new RenderQueue(renderConcurrency, maxQueuedRenders);
 
-async function acquireRenderSlot(): Promise<() => void> {
-  if (activeRenders < renderConcurrency) {
-    activeRenders += 1;
-    return releaseRenderSlot;
-  }
-  if (waiting.length >= maxQueuedRenders) {
-    throw new Error("This Mac is already rendering several diagrams. Wait for one to finish, then retry.");
-  }
-  await new Promise<void>((resolve) => waiting.push(resolve));
-  return releaseRenderSlot;
+function abortError(signal: AbortSignal): Error {
+  return signal.reason instanceof Error ? signal.reason : new Error("Rendering was cancelled.");
 }
 
-function releaseRenderSlot(): void {
-  const next = waiting.shift();
-  if (next) next();
-  else activeRenders = Math.max(0, activeRenders - 1);
+function abortable<T>(operation: Promise<T>, signal: AbortSignal): Promise<T> {
+  if (signal.aborted) return Promise.reject(abortError(signal));
+  return new Promise<T>((resolve, reject) => {
+    const onAbort = () => reject(abortError(signal));
+    signal.addEventListener("abort", onAbort, { once: true });
+    operation.then(resolve, reject).finally(() => signal.removeEventListener("abort", onAbort));
+  });
 }
 
-export async function renderMermaidArtifacts(source: string, theme: string, scale: number): Promise<{ png: Buffer; svg: string }> {
-  const release = await acquireRenderSlot();
-  let temp: string | undefined;
+function svgDimensions(svg: string): { width: number; height: number } {
+  const match = svg.match(/\bviewBox=["']\s*[-+\d.eE]+\s+[-+\d.eE]+\s+([-+\d.eE]+)\s+([-+\d.eE]+)\s*["']/i);
+  if (!match) throw new Error("Headless rendering did not produce measurable SVG dimensions.");
+  return { width: Math.ceil(Number(match[1])), height: Math.ceil(Number(match[2])) };
+}
+
+export async function renderMermaidArtifacts(source: string, theme: DiagramTheme, scale: number, requestSignal?: AbortSignal): Promise<{ png: Buffer; svg: string }> {
+  const controller = new AbortController();
+  const onRequestAbort = () => controller.abort(new Error("The client disconnected before rendering completed."));
+  requestSignal?.addEventListener("abort", onRequestAbort, { once: true });
+  if (requestSignal?.aborted) onRequestAbort();
+  const timeout = setTimeout(() => controller.abort(new Error(`Headless rendering timed out after ${renderTimeoutMs}ms.`)), renderTimeoutMs);
+  let release: (() => void) | undefined;
+  let browser: Browser | undefined;
   try {
-    temp = await mkdtemp(join(tmpdir(), "mermaid-studio-"));
-    const input = join(temp, "diagram.mmd");
-    const output = join(temp, "diagram.png");
-    const svgOutput = join(temp, "diagram.svg");
-    const config = join(temp, "mermaid-config.json");
-    const command = process.platform === "win32" ? join(APP_ROOT, "node_modules", ".bin", "mmdc.cmd") : join(APP_ROOT, "node_modules", ".bin", "mmdc");
-    await Promise.all([writeFile(input, source, "utf8"), writeFile(config, JSON.stringify({ theme }), "utf8")]);
-    const themeArguments = theme === "base" ? ["-c", config] : ["-t", theme];
-    await Promise.all([
-      execFileAsync(command, ["-i", input, "-o", output, ...themeArguments, "-b", "transparent", "-s", String(scale)], { timeout: renderTimeoutMs, maxBuffer: 1024 * 1024 }),
-      execFileAsync(command, ["-i", input, "-o", svgOutput, ...themeArguments, "-b", "transparent"], { timeout: renderTimeoutMs, maxBuffer: 1024 * 1024 })
-    ]);
-    const [png, svg] = await Promise.all([readFile(output), readFile(svgOutput, "utf8")]);
+    release = await renderQueue.acquire(controller.signal);
+    const launch = puppeteer.launch({ headless: true });
+    try {
+      browser = await abortable(launch, controller.signal);
+    } catch (cause) {
+      void launch.then((lateBrowser) => lateBrowser.close()).catch(() => undefined);
+      throw cause;
+    }
+    const common = { backgroundColor: "transparent", mermaidConfig: { theme } };
+    const svgResult = await abortable(renderMermaid(browser, source, "svg", common), controller.signal);
+    const svg = new TextDecoder().decode(svgResult.data);
+    const dimensions = svgDimensions(svg);
+    assertPixelBudget(Math.ceil(dimensions.width * scale), Math.ceil(dimensions.height * scale));
+    const pngResult = await abortable(renderMermaid(browser, source, "png", {
+      ...common,
+      viewport: { width: 800, height: 600, deviceScaleFactor: scale }
+    }), controller.signal);
+    const png = Buffer.from(pngResult.data);
+    assertPngWithinLimits(png);
     return { png, svg };
   } catch (cause) {
     const rawMessage = cause instanceof Error ? cause.message : "Unknown Mermaid CLI failure";
     let message = rawMessage.replaceAll(APP_ROOT, "<project>");
-    if (temp) message = message.replaceAll(temp, "<temporary directory>");
     message = message.slice(0, 2_000);
     throw new Error(`Headless rendering failed. Ensure Mermaid CLI's browser dependency is installed, then retry. ${message}`);
   } finally {
-    if (temp) await rm(temp, { recursive: true, force: true });
-    release();
+    clearTimeout(timeout);
+    requestSignal?.removeEventListener("abort", onRequestAbort);
+    await browser?.close().catch(() => undefined);
+    release?.();
   }
 }
 

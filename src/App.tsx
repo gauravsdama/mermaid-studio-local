@@ -5,6 +5,7 @@ import { cleanSvgForExport, downloadDataUrl, downloadText, filenameFor, svgToPng
 import { enableFlowEditor } from "./lib/flowEditor";
 import { deleteFromLibrary, getHistory, getLibrary, rememberDiagram, saveToLibrary } from "./lib/storage";
 import type { ArtifactRecord, DiagramTheme, SaveArtifactRequest, SavedDiagram } from "./types";
+import { DIAGRAM_THEMES, MAX_DIAGRAM_TITLE_LENGTH, MAX_MERMAID_SOURCE_LENGTH } from "../shared/contractValues";
 
 const STARTER = `flowchart LR
   Draft[Mermaid code] --> Preview[Live preview]
@@ -13,13 +14,13 @@ const STARTER = `flowchart LR
   Decision -->|Yes| Arrange[Optional freeform editor]
   Arrange --> Export`;
 
-const THEMES: DiagramTheme[] = ["default", "dark", "forest", "neutral", "base"];
 const STATIC_DEMO = import.meta.env.VITE_STATIC_DEMO === "true";
 
 function App() {
-  const [title, setTitle] = useState("Untitled diagram");
-  const [source, setSource] = useState(STARTER);
-  const [theme, setTheme] = useState<DiagramTheme>("default");
+  const initialDemo = demoPrompts[0];
+  const [title, setTitle] = useState(STATIC_DEMO ? initialDemo.title : "Untitled diagram");
+  const [source, setSource] = useState(STATIC_DEMO ? initialDemo.source : STARTER);
+  const [theme, setTheme] = useState<DiagramTheme>(STATIC_DEMO ? initialDemo.theme : "default");
   const [svgMarkup, setSvgMarkup] = useState("");
   const [error, setError] = useState("");
   const [zoom, setZoom] = useState(1);
@@ -32,29 +33,42 @@ function App() {
   const renderHost = useRef<HTMLDivElement>(null);
   const previewPanel = useRef<HTMLElement>(null);
   const renderVersion = useRef(0);
+  const renderQueue = useRef<Promise<void>>(Promise.resolve());
 
   const isFlowchart = useMemo(() => /^\s*(flowchart|graph)\b/i.test(source), [source]);
   const isSequence = useMemo(() => /^\s*sequenceDiagram\b/i.test(source), [source]);
 
   useEffect(() => {
+    const version = ++renderVersion.current;
+    let cancelled = false;
     const timer = window.setTimeout(async () => {
-      const version = ++renderVersion.current;
       try {
         const { default: mermaid } = await import("mermaid");
-        mermaid.initialize({ startOnLoad: false, securityLevel: "strict", theme });
-        const result = await mermaid.render(`mermaid-studio-${version}`, source);
-        if (version !== renderVersion.current) return;
-        setSvgMarkup(result.svg);
+        let svg: string | undefined;
+        const queued = renderQueue.current.catch(() => undefined).then(async () => {
+          if (cancelled || version !== renderVersion.current) return;
+          mermaid.initialize({ startOnLoad: false, securityLevel: "strict", theme });
+          svg = (await mermaid.render(`mermaid-studio-${version}`, source)).svg;
+        });
+        renderQueue.current = queued;
+        await queued;
+        if (cancelled || version !== renderVersion.current || !svg) return;
+        setSvgMarkup(svg);
         setError("");
         setEditing(false);
+        setSequenceStep(0);
+        setSequenceTotal(0);
         setNotice("Preview updated");
       } catch (cause) {
-        if (version !== renderVersion.current) return;
+        if (cancelled || version !== renderVersion.current) return;
         setError(cause instanceof Error ? cause.message.replace(/^Error:\s*/, "") : "Mermaid could not render this code.");
         setSvgMarkup("");
       }
     }, 260);
-    return () => window.clearTimeout(timer);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
   }, [source, theme]);
 
   useEffect(() => {
@@ -177,7 +191,7 @@ function App() {
     setTitle(prompt.title);
     setSource(prompt.source);
     setTheme(prompt.theme);
-    setNotice(`Loaded demo prompt “${prompt.label}”`);
+    setNotice(`Loaded “${prompt.title}”`);
   };
 
   useEffect(() => {
@@ -201,8 +215,8 @@ function App() {
   return (
     <main className="app-shell">
       <header className="topbar">
-        <div className="brand"><span className="brand-mark">↗</span><span>Mermaid <b>Studio</b></span><em>{STATIC_DEMO ? "demo" : "local"}</em></div>
-        <div className="title-input"><label htmlFor="diagram-title">Diagram title</label><input id="diagram-title" value={title} onChange={(event) => setTitle(event.target.value)} maxLength={120} /></div>
+        <div className="brand"><span className="brand-mark">↗</span><span>Mermaid <b>Studio</b></span>{!STATIC_DEMO && <em>local</em>}</div>
+        <div className="title-input"><label htmlFor="diagram-title">Diagram title</label><input id="diagram-title" value={title} onChange={(event) => setTitle(event.target.value)} maxLength={MAX_DIAGRAM_TITLE_LENGTH} /></div>
         <div className="header-actions">
           <button className="ghost" onClick={saveLocal}>Save library</button>
           {!STATIC_DEMO && <button className="primary" onClick={() => void saveToFolder()}>Save to app folder</button>}
@@ -212,12 +226,12 @@ function App() {
       <section className="workspace">
         <aside className="sidebar" aria-label="Diagram tools">
           {STATIC_DEMO && <section>
-            <p className="eyebrow">Simulated prompts</p>
-            <p className="tiny-note">Each prompt loads a local example. No model or backend is running.</p>
+            <p className="eyebrow">Diagram request</p>
+            <p className="tiny-note">Choose a request to load its diagram.</p>
             <div className="demo-list">{demoPrompts.map((prompt, index) => <button key={prompt.label} onClick={() => loadDemoPrompt(index)}>{prompt.label}</button>)}</div>
           </section>}
           <section>
-            <p className="eyebrow">Starting point</p>
+            <p className="eyebrow">Style</p>
             <select aria-label="Preset diagrams" defaultValue="" onChange={(event) => {
               const preset = presets.find((item) => item.name === event.target.value);
               if (preset) { setTitle(preset.name); setSource(preset.source); setTheme(preset.theme); }
@@ -230,7 +244,7 @@ function App() {
             <p className="eyebrow">Render settings</p>
             <label className="field-label" htmlFor="theme">Mermaid theme</label>
             <select id="theme" value={theme} onChange={(event) => setTheme(event.target.value as DiagramTheme)}>
-              {THEMES.map((item) => <option key={item}>{item}</option>)}
+              {DIAGRAM_THEMES.map((item) => <option key={item}>{item}</option>)}
             </select>
             <p className="tiny-note">Exports always use a transparent canvas at 4× resolution.</p>
           </section>
@@ -246,7 +260,7 @@ function App() {
 
         <section className="editor-pane">
           <div className="pane-heading"><div><p className="eyebrow">Source</p><h1>Write the diagram</h1></div><span className={error ? "status error" : "status"} aria-live="polite">{error ? "Fix syntax" : "Live"}</span></div>
-          <textarea aria-label="Mermaid code" spellCheck="false" value={source} onChange={(event) => setSource(event.target.value)} />
+          <textarea aria-label="Mermaid code" spellCheck="false" maxLength={MAX_MERMAID_SOURCE_LENGTH} value={source} onChange={(event) => setSource(event.target.value)} />
           <div className="editor-footer"><span>⌘/Ctrl + S library · ⇧⌘/Ctrl + S SVG · ⇧⌘/Ctrl + P PNG</span><button className="text-button" onClick={() => { setSource(STARTER); setTitle("Untitled diagram"); }}>Reset</button></div>
         </section>
 

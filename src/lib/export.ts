@@ -1,8 +1,18 @@
+import { MAX_PNG_DIMENSION, MAX_PNG_PIXELS } from "../../shared/contractValues";
+
 const XMLNS = "http://www.w3.org/2000/svg";
 
 export function cleanSvgForExport(svg: SVGSVGElement): string {
   const copy = svg.cloneNode(true) as SVGSVGElement;
   copy.querySelector("[data-studio-handle-layer]")?.remove();
+  for (const node of copy.querySelectorAll<SVGElement>("[data-studio-node]")) {
+    node.removeAttribute("data-studio-node");
+    node.removeAttribute("tabindex");
+    node.removeAttribute("role");
+    node.removeAttribute("aria-label");
+    node.style.removeProperty("cursor");
+    if (!node.getAttribute("style")) node.removeAttribute("style");
+  }
   copy.removeAttribute("style");
   copy.setAttribute("xmlns", XMLNS);
   copy.setAttribute("width", String(Math.ceil(svg.viewBox.baseVal.width || svg.getBoundingClientRect().width)));
@@ -48,6 +58,9 @@ export async function svgToPngDataUrl(svgText: string, scale = 4): Promise<strin
     });
     const width = Math.max(1, Math.ceil((image.naturalWidth || 1200) * scale));
     const height = Math.max(1, Math.ceil((image.naturalHeight || 800) * scale));
+    if (width > MAX_PNG_DIMENSION || height > MAX_PNG_DIMENSION || width * height > MAX_PNG_PIXELS) {
+      throw new Error(`PNG export is limited to ${MAX_PNG_DIMENSION}px per side and ${MAX_PNG_PIXELS.toLocaleString()} total pixels.`);
+    }
     const canvas = document.createElement("canvas");
     canvas.width = width;
     canvas.height = height;

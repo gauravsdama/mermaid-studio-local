@@ -5,6 +5,7 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createServer } from "node:net";
+import { createServer as createHttpServer } from "node:http";
 
 const artifactRoot = await mkdtemp(join(tmpdir(), "mermaid-studio-mcp-artifacts-"));
 const probe = createServer();
@@ -13,6 +14,29 @@ const address = probe.address();
 const port = typeof address === "object" && address ? address.port : 0;
 await new Promise((resolvePromise) => probe.close(resolvePromise));
 if (!port) throw new Error("Could not reserve a loopback MCP test port.");
+
+const impostor = createHttpServer((_request, response) => {
+  response.writeHead(200, { "content-type": "application/json" });
+  response.end(JSON.stringify({ ok: true, service: "not-mermaid-studio" }));
+});
+await new Promise((resolvePromise, reject) => impostor.once("error", reject).listen(port, "127.0.0.1", resolvePromise));
+const impostorTransport = new StdioClientTransport({
+  command: process.execPath,
+  args: [resolve(process.cwd(), "dist/mcp/index.js")],
+  cwd: process.cwd(),
+  env: { ...process.env, MCP_API_BASE_URL: `http://127.0.0.1:${port}` },
+  stderr: "ignore"
+});
+const impostorClient = new Client({ name: "mermaid-studio-identity-smoke", version: "0.1.0" });
+try {
+  await impostorClient.connect(impostorTransport);
+  const rejected = await impostorClient.callTool({ name: "mermaid_studio_list_diagrams", arguments: {} });
+  const message = rejected.content.map((part) => part.type === "text" ? part.text : "").join("");
+  if (!rejected.isError || !message.includes("different service")) throw new Error("MCP gateway identity check accepted an unrelated loopback service.");
+} finally {
+  await impostorTransport.close();
+  await new Promise((resolveClose) => impostor.close(resolveClose));
+}
 
 const transport = new StdioClientTransport({
   command: process.execPath,

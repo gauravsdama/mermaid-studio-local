@@ -2,34 +2,51 @@ import { spawn, type ChildProcess } from "node:child_process";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { APP_ROOT } from "../../server/paths.js";
+import { gatewayHealthSchema } from "../../shared/contracts.js";
+import { parseGatewayBaseUrl } from "./gatewayUrl.js";
 
-const API_BASE_URL = process.env.MCP_API_BASE_URL ?? "http://127.0.0.1:8787";
+const configuredBaseUrl = parseGatewayBaseUrl(process.env.MCP_API_BASE_URL ?? "http://127.0.0.1:8787");
+const API_BASE_URL = configuredBaseUrl.origin;
 let localGateway: ChildProcess | undefined;
+
+async function gatewayIsReady(): Promise<boolean> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 2_000);
+  try {
+    const response = await fetch(`${API_BASE_URL}/health`, { signal: controller.signal, redirect: "manual" });
+    if (!response.ok) return false;
+    const body = await response.json();
+    if (!gatewayHealthSchema.safeParse(body).success) {
+      throw new Error(`A different service is listening at ${API_BASE_URL}; refusing to send Mermaid source to it.`);
+    }
+    return true;
+  } catch (cause) {
+    if (cause instanceof Error && cause.message.includes("different service")) throw cause;
+    return false;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
 
 async function waitForGateway(): Promise<void> {
   for (let attempt = 0; attempt < 30; attempt += 1) {
-    try {
-      const response = await fetch(`${API_BASE_URL}/health`);
-      if (response.ok) return;
-    } catch { /* The sidecar may still be starting. */ }
+    if (await gatewayIsReady()) return;
     await new Promise((resolve) => setTimeout(resolve, 100));
   }
   throw new Error("The Mermaid Studio gateway did not start. Run npm run build and check that port 8787 is available.");
 }
 
 async function ensureGateway(): Promise<void> {
-  try {
-    const response = await fetch(`${API_BASE_URL}/health`);
-    if (response.ok) return;
-  } catch { /* Start a local sidecar below when no gateway is reachable. */ }
+  if (await gatewayIsReady()) return;
 
-  if (!/^http:\/\/(127\.0\.0\.1|localhost)(:\d+)?$/.test(API_BASE_URL)) {
-    throw new Error(`Mermaid Studio gateway is unavailable at ${API_BASE_URL}. The MCP server only auto-starts a local gateway.`);
-  }
   if (!localGateway || localGateway.exitCode !== null) {
     const entry = join(APP_ROOT, "dist", "server", "index.js");
     if (!existsSync(entry)) throw new Error("Mermaid Studio is not built. Run npm run build once before using the MCP server.");
-    localGateway = spawn(process.execPath, [entry], { cwd: APP_ROOT, stdio: "ignore" });
+    localGateway = spawn(process.execPath, [entry], {
+      cwd: APP_ROOT,
+      env: { ...process.env, PORT: configuredBaseUrl.port || "80" },
+      stdio: "ignore"
+    });
     process.once("exit", () => localGateway?.kill());
   }
   await waitForGateway();

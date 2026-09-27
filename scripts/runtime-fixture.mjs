@@ -29,7 +29,8 @@ export async function createRuntimeFixture(environment = {}) {
     if (child.exitCode !== null) throw new Error(`Test server exited early. ${stderr}`);
     try {
       const response = await fetch(`${baseUrl}/health`);
-      if (response.ok) {
+      const health = response.ok ? await response.json() : undefined;
+      if (health?.gatewayIdentity === "mermaid-studio-local-gateway" && health?.apiVersion === 1) {
         return {
           artifactRoot,
           baseUrl,
