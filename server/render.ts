@@ -41,7 +41,10 @@ export async function renderMermaidArtifacts(source: string, theme: DiagramTheme
   let browser: Browser | undefined;
   try {
     release = await renderQueue.acquire(controller.signal);
-    const launch = puppeteer.launch({ headless: true });
+    const launch = puppeteer.launch({
+      headless: true,
+      ...(process.env.CI ? { args: ["--no-sandbox", "--disable-setuid-sandbox"] } : {})
+    });
     try {
       browser = await abortable(launch, controller.signal);
     } catch (cause) {
